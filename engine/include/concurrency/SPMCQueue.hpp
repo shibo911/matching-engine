@@ -8,7 +8,7 @@
 namespace matching_engine {
 namespace concurrency {
 
-// CACHE_LINE_SIZE defined in SPSCQueue.hpp or common constants
+inline constexpr std::size_t SPMC_CACHE_LINE_SIZE = 64;
 
 // SPMC Broadcast Queue using the Disruptor Seqlock pattern.
 // Producer NEVER waits (Wait-Free). Multiple Consumers read independently.
@@ -95,7 +95,7 @@ private:
     std::pmr::vector<Slot> buffer_;
     
     // Aligned to completely isolate the global head counter from buffer memory
-    alignas(CACHE_LINE_SIZE) std::atomic<std::size_t> head_sequence_{0};
+    alignas(SPMC_CACHE_LINE_SIZE) std::atomic<std::size_t> head_sequence_{0};
 };
 
 } // namespace concurrency

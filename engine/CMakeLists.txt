@@ -19,3 +19,27 @@ add_executable(engine
     src/main.cpp 
     src/memory/EngineMemory.cpp
 )
+
+# ========================================================================
+# Phase 4: Google Benchmark
+# ========================================================================
+include(FetchContent)
+FetchContent_Declare(
+  benchmark
+  GIT_REPOSITORY https://github.com/google/benchmark.git
+  GIT_TAG        v1.8.3
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark tests" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install" FORCE)
+FetchContent_MakeAvailable(benchmark)
+
+add_executable(engine_benchmarks
+    src/benchmarks.cpp
+    src/memory/EngineMemory.cpp
+)
+target_link_libraries(engine_benchmarks PRIVATE benchmark::benchmark benchmark::benchmark_main)
+
+add_executable(engine_latency
+    src/latency_histogram.cpp
+    src/memory/EngineMemory.cpp
+)
