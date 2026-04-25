@@ -23,5 +23,14 @@ struct Order {
     Side side = Side::Buy;
 };
 
+// ========================================================================
+// MECHANICAL SYMPATHY: COMPILE-TIME PACKING ENFORCEMENT
+// ========================================================================
+// Prevent future developers from adding variables that break L1 Cache alignment.
+// 3 pointers (24) + 2 uint32 (8) + 1 uint8 (1) = 33 bytes.
+// Padded to the nearest 8-byte boundary = 40 bytes.
+static_assert(sizeof(Order) == 40, "Order struct packing has been compromised! Expected exactly 40 bytes.");
+static_assert(alignof(Order) == 8, "Order struct must be aligned to 8-byte boundaries.");
+
 } // namespace data
 } // namespace matching_engine

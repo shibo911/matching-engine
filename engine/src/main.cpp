@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <thread>
 #include "memory/EngineMemory.hpp"
+#include "memory/ObjectPool.hpp"
 #include "data/Order.hpp"
 #include "data/LimitOrderBook.hpp"
 #include "data/CancelLookup.hpp"
@@ -12,6 +13,7 @@
 #include "concurrency/ThreadUtils.hpp"
 #include "concurrency/SPSCQueue.hpp"
 #include "concurrency/SPMCQueue.hpp"
+#include "core/MatchingEngine.hpp"
 
 // ========================================================================
 // ZERO-ALLOCATION ENFORCEMENT
@@ -33,37 +35,26 @@ void operator delete(void* ptr) noexcept { std::free(ptr); }
 void operator delete[](void* ptr) noexcept { std::free(ptr); }
 // ========================================================================
 
-template <typename T>
-class ObjectPool {
-public:
-    ObjectPool(size_t capacity, std::pmr::polymorphic_allocator<std::byte> alloc)
-        : pool_(alloc) { pool_.reserve(capacity); }
-
-    template <typename... Args>
-    T* allocate(Args&&... args) {
-        pool_.emplace_back(std::forward<Args>(args)...);
-        return &pool_.back();
-    }
-private:
-    std::pmr::vector<T> pool_;
-};
-
 struct IngressMessage {
-    uint64_t order_id;
-    uint32_t price;
-    uint32_t quantity;
-    bool is_cancel; 
-    matching_engine::data::Side side;
+    uint64_t order_id;  // 8 bytes
+    uint32_t price;     // 4 bytes
+    uint32_t quantity;  // 4 bytes
+    bool is_cancel;     // 1 byte
+    matching_engine::data::Side side; // 1 byte
 };
+
+// 8 + 4 + 4 + 1 + 1 = 18 bytes. Padded to 24.
+static_assert(sizeof(IngressMessage) == 24, "IngressMessage packing compromised!");
 
 int main() {
     using namespace matching_engine::memory;
     using namespace matching_engine::data;
     using namespace matching_engine::concurrency;
+    using namespace matching_engine::core;
 
     try {
-        std::cout << "[INIT] Bootstrapping Engine Memory (500MB)..." << std::endl;
-        EngineMemory memory;
+        std::cout << "[INIT] Bootstrapping Engine Memory (700MB)..." << std::endl;
+        EngineMemory memory(734003200); // 700 MB to accommodate the new Free List arrays
         std::pmr::polymorphic_allocator<std::byte> alloc = memory.get_allocator();
 
         const uint32_t MIN_PRICE = 10000;
@@ -75,9 +66,10 @@ int main() {
         ObjectPool<Order> order_pool(MAX_ORDERS, alloc);
         
         SPSCQueue<IngressMessage, 1024> ingress_queue(alloc);
-        
-        std::cout << "[INIT] Allocating SPMC Broadcast Egress Queue (Capacity 1024)..." << std::endl;
         SPMCBroadcastQueue<TradeEvent, 1024> egress_queue(alloc);
+
+        // Core matching logic
+        MatchingEngine engine(&lob, &cancel_lookup, &order_pool, &egress_queue);
 
         std::cout << "[SUCCESS] Component initialization complete.\n" << std::endl;
 
@@ -87,44 +79,46 @@ int main() {
         
         std::atomic<int> trades_broadcasted_atomic{0};
 
-        // --- 1. THE CONSUMER THREADS (WebSocket Visualization Gateways) ---
-        // Simulating 2 independent WebSockets consuming the identical broadcast
-        auto spawn_websocket = [&](int ws_id) {
-            return std::thread([&, ws_id]() {
-                size_t local_read_seq = 0; // Private consumer sequence
-                TradeEvent evt;
-                
-                while (trades_broadcasted_atomic.load(std::memory_order_acquire) < 1) {
-                    // Lock-free popping
-                    if (egress_queue.pop(local_read_seq, evt)) {
-                        std::cout << "[WEBSOCKET " << ws_id << "] Received Trade Broadcast! ID: " 
-                                  << evt.trade_id << " | Price: " << evt.price 
-                                  << " | Qty: " << evt.quantity << std::endl;
-                    }
+        // --- 1. THE CONSUMER THREAD (WebSocket Gateway) ---
+        std::thread ws_thread([&]() {
+            size_t local_read_seq = 0; 
+            TradeEvent evt;
+            
+            while (trades_broadcasted_atomic.load(std::memory_order_acquire) < 1) {
+                if (egress_queue.pop(local_read_seq, evt)) {
+                    std::cout << "[WEBSOCKET] Match Executed! TradeID: " << evt.trade_id 
+                              << " | Maker: " << evt.maker_order_id << " | Taker: " << evt.taker_order_id
+                              << " | Price: " << evt.price << " | Qty: " << evt.quantity << std::endl;
+                    trades_broadcasted_atomic.store(1, std::memory_order_release);
                 }
-            });
-        };
-
-        std::thread ws_thread_1 = spawn_websocket(1);
-        std::thread ws_thread_2 = spawn_websocket(2);
+            }
+        });
 
         // --- 2. THE PINNED MATCHING ENGINE THREAD ---
         std::thread engine_thread([&]() {
             pin_current_thread_to_core(1);
             
             IngressMessage msg;
-            bool trade_executed = false;
+            int messages_processed = 0;
 
-            while (!trade_executed) {
+            // We expect exactly 2 messages from the Gateway
+            while (messages_processed < 2) {
                 if (ingress_queue.pop(msg)) {
-                    // Simulate Crossing Logic resulting in a Trade
-                    TradeEvent new_trade{ 999, 42, 43, msg.price, msg.quantity };
-                    
-                    // PRODUCER: Instantly fire and forget into the broadcast queue
-                    egress_queue.push(new_trade);
-                    
-                    trade_executed = true;
-                    trades_broadcasted_atomic.store(1, std::memory_order_release);
+                    if (msg.is_cancel) {
+                        Order* to_cancel = cancel_lookup.get_order(msg.order_id); 
+                        if (to_cancel) {
+                            lob.remove_order(to_cancel);               
+                            cancel_lookup.deregister_order(msg.order_id);
+                            order_pool.deallocate(to_cancel);
+                        }
+                    } else {
+                        // Dynamically allocate from Object Pool
+                        Order* order = order_pool.allocate(nullptr, nullptr, msg.order_id, msg.price, msg.quantity, msg.side);
+                        
+                        // Pass to the ultra-low-latency crossing algorithm!
+                        engine.process_order(order);
+                    }
+                    messages_processed++;
                 }
             }
         });
@@ -137,9 +131,13 @@ int main() {
         
         auto t_start = std::chrono::high_resolution_clock::now();
 
-        // Gateway pushes an incoming order
-        IngressMessage insert_msg{43, 15000, 100, false, Side::Sell};
-        while(!ingress_queue.push(insert_msg)) {} 
+        // Gateway pushes a Sell order (Making liquidity)
+        IngressMessage make_msg{101, 15000, 100, false, Side::Sell};
+        while(!ingress_queue.push(make_msg)) {} 
+
+        // Gateway pushes a Buy order (Crossing the book! Takes liquidity)
+        IngressMessage cross_msg{102, 15000, 50, false, Side::Buy};
+        while(!ingress_queue.push(cross_msg)) {} 
 
         // Wait for Engine to cross the trade and broadcast it
         while (trades_broadcasted_atomic.load(std::memory_order_acquire) < 1) {}
@@ -150,12 +148,11 @@ int main() {
         std::cout << ">>> EXITING HOT PATH. HEAP UNLOCKED. <<<\n" << std::endl;
 
         engine_thread.join();
-        ws_thread_1.join();
-        ws_thread_2.join();
+        ws_thread.join();
         // ========================================================================
 
-        std::cout << "[PROOF] 4-Thread execution finished with 0 heap allocations." << std::endl;
-        std::cout << "[METRICS] Gateway -> Engine -> WebSockets Total Latency: " 
+        std::cout << "[PROOF] Full algorithmic crossing executed with 0 heap allocations." << std::endl;
+        std::cout << "[METRICS] Gateway -> Crossing Engine -> WebSocket Total Latency: " 
                   << std::chrono::duration_cast<std::chrono::nanoseconds>(t_end - t_start).count() 
                   << " ns." << std::endl;
 

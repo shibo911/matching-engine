@@ -15,5 +15,11 @@ struct alignas(8) PriceLevel {
     // simultaneously rest at the same price. By omitting it, we save padding space.
 };
 
+// ========================================================================
+// MECHANICAL SYMPATHY: COMPILE-TIME PACKING ENFORCEMENT
+// ========================================================================
+// List(16) + Volume(8) = 24 bytes. 
+static_assert(sizeof(PriceLevel) == 24, "PriceLevel must be exactly 24 bytes so multiple levels fit into one L1 Cache Line!");
+
 } // namespace data
 } // namespace matching_engine

@@ -14,5 +14,12 @@ struct TradeEvent {
     uint32_t quantity;
 };
 
+// ========================================================================
+// MECHANICAL SYMPATHY: COMPILE-TIME PACKING ENFORCEMENT
+// ========================================================================
+// 3 uint64 (24) + 2 uint32 (8) = 32 bytes exactly. Zero padding.
+// Perfectly fills exactly half of an x86 64-byte Cache Line.
+static_assert(sizeof(TradeEvent) == 32, "TradeEvent must be exactly 32 bytes for optimal broadcast performance!");
+
 } // namespace data
 } // namespace matching_engine
