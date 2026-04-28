@@ -1,8 +1,23 @@
 import { TradeEvent, WebSocketMessage, OrderBook, LatencyMetrics, Side } from '@/types';
 
 // WebSocket configuration
+// Use environment variable for production, fallback to localhost for development
+const getWebSocketUrl = () => {
+    // For Vercel deployment, use NEXT_PUBLIC_WS_URL environment variable
+    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL) {
+        return process.env.NEXT_PUBLIC_WS_URL;
+    }
+    // For local development with Railway backend
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+        // If running on a non-localhost domain, assume wss://
+        return `wss://${window.location.hostname}/ws`;
+    }
+    // Default local development
+    return 'ws://127.0.0.1:8080/ws';
+};
+
 const WS_CONFIG = {
-    url: 'ws://127.0.0.1:8080/ws',
+    url: getWebSocketUrl(),
     reconnectInterval: 3000,
     maxReconnectAttempts: 10,
     exponentialBackoff: true,
