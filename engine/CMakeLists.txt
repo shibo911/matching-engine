@@ -67,8 +67,10 @@ if(UWS_ENABLE)
     FetchContent_MakeAvailable(uWebSockets)
 
     target_link_libraries(engine PRIVATE uWebSockets::uWebSockets)
+    target_compile_definitions(engine PRIVATE UWS_ENABLE=1)
 else()
     message(STATUS "uWebSockets disabled")
+    target_compile_definitions(engine PRIVATE UWS_ENABLE=0)
 endif()
 
 # ========================================================================
