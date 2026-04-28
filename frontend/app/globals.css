@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+/* Bloomberg Terminal / Binance Pro Theme */
+:root {
+  --background: #0a0e17;
+  /* Dark blue-black background */
+  --foreground: #d1d5db;
+  /* Light gray text */
+  --terminal-green: #00ff00;
+  --terminal-red: #ff0000;
+  --terminal-yellow: #ffff00;
+  --terminal-cyan: #00ffff;
+  --terminal-blue: #0088ff;
+  --terminal-purple: #ff00ff;
+  --border-color: #1e293b;
+  --panel-bg: #111827;
+  --header-bg: #020617;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace;
+  --radius-lg: 0.125rem;
+  --radius-md: 0.125rem;
+  --radius-sm: 0.125rem;
+  --color-terminal-green: var(--terminal-green);
+  --color-terminal-red: var(--terminal-red);
+  --color-terminal-yellow: var(--terminal-yellow);
+  --color-terminal-cyan: var(--terminal-cyan);
+  --color-terminal-blue: var(--terminal-blue);
+  --color-terminal-purple: var(--terminal-purple);
+  --color-border: var(--border-color);
+  --color-panel: var(--panel-bg);
+  --color-header: var(--header-bg);
+}
+
+/* Custom scrollbar for terminal style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a2236;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Terminal selection */
+::selection {
+  background-color: rgba(0, 136, 255, 0.3);
+  color: #ffffff;
+}
+
+/* Global styles */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Terminal text effects */
+.terminal-text {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+.blink {
+  animation: blink 1s infinite;
+}
+
+/* Grid lines */
+.grid-line {
+  stroke: #1e293b;
+  stroke-width: 0.5;
+}
+
+/* Data table styles */
+.data-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 4px 8px;
+  background-color: rgba(30, 41, 59, 0.5);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.data-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.3);
+}
+
+.data-table tr:hover {
+  background-color: rgba(30, 41, 59, 0.2);
+}
+
+/* Panel styles */
+.panel {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.panel-header {
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 12px;
+  font-weight: 600;
+  color: #cbd5e1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-content {
+  padding: 12px;
+}
+
+/* Status indicators */
+.status-connected {
+  color: var(--terminal-green);
+}
+
+.status-disconnected {
+  color: var(--terminal-red);
+}
+
+.status-warning {
+  color: var(--terminal-yellow);
+}
+
+/* Buy/Sell colors */
+.buy-color {
+  color: var(--terminal-green);
+}
+
+.sell-color {
+  color: var(--terminal-red);
+}
+
+.buy-bg {
+  background-color: rgba(0, 255, 0, 0.1);
+}
+
+.sell-bg {
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+/* Depth chart gradients */
+.depth-bid-gradient {
+  stop-color: rgba(0, 255, 0, 0.3);
+}
+
+.depth-ask-gradient {
+  stop-color: rgba(255, 0, 0, 0.3);
+}
+
+/* Tooltip styles */
+.tooltip {
+  background-color: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  padding: 8px;
+  font-size: 12px;
+  color: #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Loading animation */
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse 2s infinite;
+}
