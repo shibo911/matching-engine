@@ -52,17 +52,24 @@ target_link_libraries(engine PRIVATE Crow::Crow)
 # ========================================================================
 # Phase 5: uWebSockets Implementation (New high-performance gateway)
 # ========================================================================
-FetchContent_Declare(
-  uWebSockets
-  GIT_REPOSITORY https://github.com/uNetworking/uWebSockets.git
-  GIT_TAG        v20.30.0
-)
-set(UWS_BUILD_TESTS OFF CACHE BOOL "Disable uWebSockets tests" FORCE)
-set(UWS_WITH_OPENSSL OFF CACHE BOOL "Disable SSL for minimal footprint" FORCE)
-set(UWS_WITH_ZLIB OFF CACHE BOOL "Disable compression for lowest latency" FORCE)
-FetchContent_MakeAvailable(uWebSockets)
+option(UWS_ENABLE "Enable uWebSockets support" ON)
 
-target_link_libraries(engine PRIVATE uWebSockets::uWebSockets)
+if(UWS_ENABLE)
+    message(STATUS "uWebSockets enabled")
+    FetchContent_Declare(
+      uWebSockets
+      GIT_REPOSITORY https://github.com/uNetworking/uWebSockets.git
+      GIT_TAG        v20.30.0
+    )
+    set(UWS_BUILD_TESTS OFF CACHE BOOL "Disable uWebSockets tests" FORCE)
+    set(UWS_WITH_OPENSSL OFF CACHE BOOL "Disable SSL for minimal footprint" FORCE)
+    set(UWS_WITH_ZLIB OFF CACHE BOOL "Disable compression for lowest latency" FORCE)
+    FetchContent_MakeAvailable(uWebSockets)
+
+    target_link_libraries(engine PRIVATE uWebSockets::uWebSockets)
+else()
+    message(STATUS "uWebSockets disabled")
+endif()
 
 # ========================================================================
 # Phase 4: Google Benchmark
