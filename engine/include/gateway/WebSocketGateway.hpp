@@ -33,6 +33,9 @@ constexpr auto DISABLED = 1;
 namespace matching_engine {
 namespace gateway {
 
+// Forward declaration for dummy app when uWebSockets is disabled
+struct DummyApp;
+
 class WebSocketGateway {
 public:
   WebSocketGateway(
@@ -103,7 +106,7 @@ private:
   std::unique_ptr<uWS::App> app_;
 #else
   // Dummy pointer when disabled
-  std::unique_ptr<void> app_;
+  std::unique_ptr<DummyApp> app_;
 #endif
 
   // Health check and metrics endpoints flag

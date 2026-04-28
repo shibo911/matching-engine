@@ -5,6 +5,11 @@
 #include <sstream>
 #include <string_view>
 
+#if !UWS_ENABLE
+// Define DummyApp when uWebSockets is disabled
+struct DummyApp {};
+#endif
+
 namespace matching_engine {
 namespace gateway {
 
