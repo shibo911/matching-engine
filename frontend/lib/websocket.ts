@@ -1,16 +1,11 @@
 import { TradeEvent, WebSocketMessage, OrderBook, LatencyMetrics, Side } from '@/types';
 
 // WebSocket configuration
-// Use environment variable for production, fallback to localhost for development
+// NEXT_PUBLIC_ variables are baked into the bundle at build time by Next.js
 const getWebSocketUrl = () => {
-    // For Vercel deployment, use NEXT_PUBLIC_WS_URL environment variable
-    if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_WS_URL) {
+    // Env var is set at build time — present in both server and client bundles
+    if (process.env.NEXT_PUBLIC_WS_URL) {
         return process.env.NEXT_PUBLIC_WS_URL;
-    }
-    // For local development with Railway backend
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-        // If running on a non-localhost domain, assume wss://
-        return `wss://${window.location.hostname}/ws`;
     }
     // Default local development
     return 'ws://127.0.0.1:8080/ws';

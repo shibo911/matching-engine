@@ -82,14 +82,18 @@ public:
           e["price"] = event.price;
           e["quantity"] = event.quantity;
           e["timestamp"] = event.timestamp;
+          e["side"] = (static_cast<int>(event.side) == 0) ? "buy" : "sell";
           batch.push_back(std::move(e));
         }
 
         // If we executed trades, serialize to JSON array and broadcast
         if (!batch.empty()) {
+          crow::json::wvalue data_obj;
+          data_obj["events"] = std::move(batch);
+
           crow::json::wvalue payload;
           payload["type"] = "trade_batch";
-          payload["events"] = std::move(batch);
+          payload["data"] = std::move(data_obj);
           std::string json_str = payload.dump();
 
           std::lock_guard<std::mutex> lock(mtx_);
