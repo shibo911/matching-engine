@@ -60,13 +60,14 @@ int main() {
 
         // Configuration for WebSocket Gateway
         gateway::GatewayConfig ws_config;
-        ws_config.port = 8080;
+        const char* env_port = std::getenv("PORT");
+        ws_config.port = env_port ? std::stoi(env_port) : 8080;
         ws_config.broadcast_fps = 20;
         ws_config.max_connections = 1000;
         
-        std::cout << "[INIT] Starting uWebSockets Gateway on ws://127.0.0.1:8080..." << std::endl;
-        std::cout << "[INIT] Health check: http://127.0.0.1:8080/health" << std::endl;
-        std::cout << "[INIT] Metrics: http://127.0.0.1:8080/metrics" << std::endl;
+        std::cout << "[INIT] Starting uWebSockets Gateway on ws://0.0.0.0:" << ws_config.port << "..." << std::endl;
+        std::cout << "[INIT] Health check: http://0.0.0.0:" << ws_config.port << "/health" << std::endl;
+        std::cout << "[INIT] Metrics: http://0.0.0.0:" << ws_config.port << "/metrics" << std::endl;
         
         gateway::WebSocketGateway ws_gateway(egress_queue, ws_config);
         if (!ws_gateway.start()) {

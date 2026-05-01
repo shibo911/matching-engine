@@ -62,7 +62,7 @@ public:
       // Setting log level to WARNING to avoid polluting the ultra-low-latency
       // stdout
       app_.loglevel(crow::LogLevel::Warning);
-      app_.port(port).multithreaded().run();
+      app_.bindaddr("0.0.0.0").port(port).multithreaded().run();
     });
 
     // 2. Start the Background Consumer & Serializer thread (20 FPS)
