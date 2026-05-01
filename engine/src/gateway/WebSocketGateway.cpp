@@ -228,6 +228,8 @@ void WebSocketGateway::broadcast_thread_func() {
   std::vector<BinaryTradeEvent> batch;
   batch.reserve(config_.queue_batch_size);
 
+  std::size_t last_sequence = 0;
+
   const auto frame_interval = milliseconds(1000 / config_.broadcast_fps);
   auto next_frame_time = steady_clock::now();
 
@@ -237,7 +239,7 @@ void WebSocketGateway::broadcast_thread_func() {
     size_t messages_collected = 0;
 
     while (batch.size() < config_.queue_batch_size) {
-      if (egress_queue_.pop(trade_event)) {
+      if (egress_queue_.pop(last_sequence, trade_event)) {
         trade_event_to_binary(trade_event, binary_event);
         batch.push_back(binary_event);
         ++messages_collected;
