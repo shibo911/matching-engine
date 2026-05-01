@@ -285,17 +285,13 @@ void WebSocketGateway::update_stats(uint64_t messages_sent,
 
   // Update messages per second calculation
   static auto last_update = steady_clock::now();
-  static uint64_t last_message_count = 0;
 
   auto now = steady_clock::now();
   auto elapsed = duration_cast<milliseconds>(now - last_update).count();
 
   if (elapsed >= 1000) { // Update every second
-    uint64_t current_messages = messages_sent_.load(std::memory_order_relaxed);
-
     // Store for next calculation
     last_update = now;
-    last_message_count = current_messages;
   }
 }
 

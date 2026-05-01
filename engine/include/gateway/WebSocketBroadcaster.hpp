@@ -17,7 +17,7 @@ class WebSocketBroadcaster {
 public:
   WebSocketBroadcaster(
       concurrency::SPMCBroadcastQueue<data::TradeEvent, 1024> &egress_queue)
-      : egress_queue_(egress_queue), running_(false), last_sequence_(0) {}
+      : egress_queue_(egress_queue), last_sequence_(0), running_(false) {}
 
   ~WebSocketBroadcaster() { stop(); }
 
@@ -38,12 +38,12 @@ public:
                 std::chrono::system_clock::now().time_since_epoch())
                 .count();
         response["connected_clients"] = users_.size();
-        response["queue_depth"] = egress_queue_.size();
+        response["queue_depth"] = 0; // Lock-free queue size not easily available
         return crow::response(200, response);
       });
 
       CROW_ROUTE(app_, "/ws")
-          .websocket()
+          .websocket(&app_)
           .onopen([&](crow::websocket::connection &conn) {
             std::lock_guard<std::mutex> lock(mtx_);
             users_.insert(&conn);
