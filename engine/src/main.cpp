@@ -69,11 +69,17 @@ int main() {
         std::cout << "[INIT] Health check: http://0.0.0.0:" << ws_config.port << "/health" << std::endl;
         std::cout << "[INIT] Metrics: http://0.0.0.0:" << ws_config.port << "/metrics" << std::endl;
         
+#if UWS_ENABLE
         gateway::WebSocketGateway ws_gateway(egress_queue, ws_config);
         if (!ws_gateway.start()) {
             std::cerr << "[ERROR] Failed to start WebSocket Gateway" << std::endl;
             return 1;
         }
+#else
+        // When uWebSockets is disabled, fallback to the Crow-based Broadcaster
+        gateway::WebSocketBroadcaster ws_gateway(egress_queue);
+        ws_gateway.start(ws_config.port);
+#endif
         
         std::cout << "[SUCCESS] Component initialization complete.\n" << std::endl;
 
