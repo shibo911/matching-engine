@@ -53,11 +53,14 @@ private:
 
                 // 3. Emit Trade Event instantly via the Wait-Free Broadcast Queue
                 egress_queue_->push(data::TradeEvent{
-                    ++trade_counter_,
-                    resting_ask->id,  // Maker
-                    buy_order->id,    // Taker
-                    fill_price,
-                    fill_qty
+                    .trade_id        = ++trade_counter_,
+                    .maker_order_id  = resting_ask->id,
+                    .taker_order_id  = buy_order->id,
+                    .timestamp       = 0,
+                    .price           = fill_price,
+                    .quantity        = fill_qty,
+                    .side            = data::Side::Buy,
+                    .reserved        = {0, 0, 0}
                 });
 
                 buy_order->quantity -= fill_qty;
@@ -105,11 +108,14 @@ private:
                 uint32_t fill_price = resting_bid->price; 
 
                 egress_queue_->push(data::TradeEvent{
-                    ++trade_counter_,
-                    resting_bid->id,  // Maker
-                    sell_order->id,   // Taker
-                    fill_price,
-                    fill_qty
+                    .trade_id        = ++trade_counter_,
+                    .maker_order_id  = resting_bid->id,
+                    .taker_order_id  = sell_order->id,
+                    .timestamp       = 0,
+                    .price           = fill_price,
+                    .quantity        = fill_qty,
+                    .side            = data::Side::Sell,
+                    .reserved        = {0, 0, 0}
                 });
 
                 sell_order->quantity -= fill_qty;
