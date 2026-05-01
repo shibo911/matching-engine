@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     git \
     make \
     libssl-dev \
+    libuv1-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -34,6 +36,8 @@ FROM ubuntu:22.04 AS runtime
 RUN apt-get update && apt-get install -y \
     libssl3 \
     ca-certificates \
+    zlib1g \
+    libuv1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
