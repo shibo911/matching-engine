@@ -184,6 +184,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Deploy to Render via deploy hook
+  deploy-render:
+    runs-on: ubuntu-latest
+    needs: build-docker-images
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Trigger Render deployment
+        run: |
+          curl -s --fail-with-body \
+            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -d ""
+          echo "Render deployment triggered successfully"
+
   # Security scanning
   security-scan:
     runs-on: ubuntu-latest
