@@ -1,7 +1,3 @@
-// ============================================================================
-// Test Suite: CancelLookup
-// Tests: register, get, deregister, out-of-bounds, capacity
-// ============================================================================
 #include <gtest/gtest.h>
 #include <memory_resource>
 #include "data/CancelLookup.hpp"
@@ -65,13 +61,11 @@ TEST_F(CancelLookupTest, OutOfBoundsGetReturnsNull) {
 
 TEST_F(CancelLookupTest, OutOfBoundsRegisterDoesNotCrash) {
     Order o = make_order(MAX_ORDERS + 1);
-    // Should be a no-op, not a crash
     cancel.register_order(&o);
     EXPECT_EQ(cancel.get_order(MAX_ORDERS + 1), nullptr);
 }
 
 TEST_F(CancelLookupTest, OutOfBoundsDeregisterDoesNotCrash) {
-    // Should be a no-op, not a crash
     cancel.deregister_order(MAX_ORDERS + 1);
 }
 
@@ -95,24 +89,22 @@ TEST_F(CancelLookupTest, ReregisterOverwritesPrevious) {
     EXPECT_EQ(cancel.get_order(5), &o1);
 
     cancel.register_order(&o2);
-    EXPECT_EQ(cancel.get_order(5), &o2); // Overwritten
+    EXPECT_EQ(cancel.get_order(5), &o2); 
 }
 
 TEST_F(CancelLookupTest, DeregisterIdempotent) {
     Order o = make_order(7);
     cancel.register_order(&o);
     cancel.deregister_order(7);
-    cancel.deregister_order(7); // Double deregister should not crash
+    cancel.deregister_order(7); 
     EXPECT_EQ(cancel.get_order(7), nullptr);
 }
 
 TEST_F(CancelLookupTest, BoundaryOrderId) {
-    // Order ID 0 — valid index
     Order o = make_order(0);
     cancel.register_order(&o);
     EXPECT_EQ(cancel.get_order(0), &o);
 
-    // Order ID MAX_ORDERS - 1 — last valid index
     Order o_last = make_order(MAX_ORDERS - 1);
     cancel.register_order(&o_last);
     EXPECT_EQ(cancel.get_order(MAX_ORDERS - 1), &o_last);

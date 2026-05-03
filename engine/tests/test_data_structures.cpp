@@ -1,8 +1,3 @@
-// ============================================================================
-// Test Suite: Core Data Structures
-// Tests: Order packing, PriceLevel packing, TradeEvent packing,
-//        IntrusiveOrderList operations (push_back, push_front, remove, pop_front)
-// ============================================================================
 #include <gtest/gtest.h>
 #include "data/Order.hpp"
 #include "data/PriceLevel.hpp"
@@ -11,9 +6,6 @@
 
 using namespace matching_engine::data;
 
-// ============================================================================
-// Compile-Time Packing Guarantees
-// ============================================================================
 TEST(OrderPacking, SizeIs40Bytes) {
     EXPECT_EQ(sizeof(Order), 40);
 }
@@ -30,9 +22,6 @@ TEST(TradeEventPacking, SizeIs40Bytes) {
     EXPECT_EQ(sizeof(TradeEvent), 40);
 }
 
-// ============================================================================
-// Order Default Construction
-// ============================================================================
 TEST(Order, DefaultConstruction) {
     Order o;
     EXPECT_EQ(o.next, nullptr);
@@ -42,10 +31,6 @@ TEST(Order, DefaultConstruction) {
     EXPECT_EQ(o.quantity, 0u);
     EXPECT_EQ(o.side, Side::Buy);
 }
-
-// ============================================================================
-// IntrusiveOrderList
-// ============================================================================
 class IntrusiveOrderListTest : public ::testing::Test {
 protected:
     IntrusiveOrderList list;
@@ -85,12 +70,10 @@ TEST_F(IntrusiveOrderListTest, PushBackMultipleElements) {
     EXPECT_EQ(list.head(), &orders[0]);
     EXPECT_EQ(list.tail(), &orders[2]);
 
-    // Verify forward chain
     EXPECT_EQ(orders[0].next, &orders[1]);
     EXPECT_EQ(orders[1].next, &orders[2]);
     EXPECT_EQ(orders[2].next, nullptr);
 
-    // Verify backward chain
     EXPECT_EQ(orders[2].prev, &orders[1]);
     EXPECT_EQ(orders[1].prev, &orders[0]);
     EXPECT_EQ(orders[0].prev, nullptr);
@@ -106,8 +89,6 @@ TEST_F(IntrusiveOrderListTest, PushFrontMultipleElements) {
     list.push_front(&orders[0]);
     list.push_front(&orders[1]);
     list.push_front(&orders[2]);
-
-    // Pushed in order 0, 1, 2 but to front — so head is 2
     EXPECT_EQ(list.head(), &orders[2]);
     EXPECT_EQ(list.tail(), &orders[0]);
 }
@@ -124,7 +105,6 @@ TEST_F(IntrusiveOrderListTest, RemoveMiddleElement) {
     EXPECT_EQ(orders[0].next, &orders[2]);
     EXPECT_EQ(orders[2].prev, &orders[0]);
 
-    // Removed node should have nulled pointers
     EXPECT_EQ(orders[1].next, nullptr);
     EXPECT_EQ(orders[1].prev, nullptr);
 }

@@ -1,8 +1,3 @@
-// ============================================================================
-// Test Suite: SPMCBroadcastQueue
-// Tests: single consumer push/pop, seqlock read validation, consumer lapping
-//        (fast-forward), multiple independent consumers
-// ============================================================================
 #include <gtest/gtest.h>
 #include <memory_resource>
 #include "concurrency/SPMCQueue.hpp"
@@ -20,7 +15,7 @@ class SPMCQueueTest : public ::testing::Test {
 protected:
     static constexpr size_t CAPACITY = 16;
 
-    EngineMemory memory{1024 * 1024 * 2}; // 2 MB
+    EngineMemory memory{1024 * 1024 * 2}; 
     std::pmr::polymorphic_allocator<std::byte> alloc{memory.get_allocator()};
     SPMCBroadcastQueue<TradeEvent, CAPACITY> queue{alloc};
 
@@ -38,9 +33,6 @@ protected:
     }
 };
 
-// ============================================================================
-// Basic Operations
-// ============================================================================
 TEST_F(SPMCQueueTest, PopFromEmptyReturnsFalse) {
     std::size_t cursor = 0;
     TradeEvent out;
@@ -89,9 +81,6 @@ TEST_F(SPMCQueueTest, CursorAdvancesBy2PerEvent) {
     EXPECT_EQ(cursor, 4u);
 }
 
-// ============================================================================
-// Multiple Independent Consumers
-// ============================================================================
 TEST_F(SPMCQueueTest, TwoConsumersReadSameData) {
     queue.push(make_event(1));
     queue.push(make_event(2));
@@ -100,14 +89,12 @@ TEST_F(SPMCQueueTest, TwoConsumersReadSameData) {
     std::size_t cursor_a = 0;
     std::size_t cursor_b = 0;
 
-    // Consumer A reads all
     std::vector<uint64_t> a_ids;
     TradeEvent out;
     while (queue.pop(cursor_a, out)) {
         a_ids.push_back(out.trade_id);
     }
 
-    // Consumer B reads all (independently)
     std::vector<uint64_t> b_ids;
     while (queue.pop(cursor_b, out)) {
         b_ids.push_back(out.trade_id);
@@ -121,33 +108,19 @@ TEST_F(SPMCQueueTest, TwoConsumersReadSameData) {
     }
 }
 
-// ============================================================================
-// Consumer Lapping (Slow Consumer Fast-Forward)
-// ============================================================================
 TEST_F(SPMCQueueTest, SlowConsumerFastForwardsOnLap) {
     std::size_t cursor = 0;
 
-    // Push more items than capacity to lap the buffer
     for (uint64_t i = 1; i <= CAPACITY * 2; i++) {
         queue.push(make_event(i));
     }
-
-    // The slow consumer at cursor=0 should detect that the producer has lapped
-    // it and fast-forward its cursor rather than returning stale data.
     TradeEvent out;
     bool result = queue.pop(cursor, out);
 
-    // After lapping, cursor should have been fast-forwarded.
-    // The consumer may or may not get data, but cursor should be at or near head.
-    // The key invariant: cursor should NOT still be 0.
     if (!result) {
         EXPECT_GT(cursor, 0u);
     }
 }
-
-// ============================================================================
-// Multi-Threaded: Producer + Multiple Consumers
-// ============================================================================
 TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
     static constexpr size_t NUM_ITEMS = 5000;
     static constexpr int NUM_CONSUMERS = 3;
@@ -158,7 +131,6 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
 
     std::atomic<bool> done{false};
 
-    // Producer: push NUM_ITEMS events
     std::thread producer([&]() {
         for (uint64_t i = 1; i <= NUM_ITEMS; i++) {
             cq.push(TradeEvent{
@@ -174,7 +146,6 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
         done.store(true, std::memory_order_release);
     });
 
-    // Each consumer counts how many valid events it read
     std::vector<std::thread> consumers;
     std::atomic<size_t> total_consumed[NUM_CONSUMERS];
     for (int c = 0; c < NUM_CONSUMERS; c++) {
@@ -204,8 +175,6 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
     producer.join();
     for (auto& t : consumers) t.join();
 
-    // Each consumer should have read at least some events
-    // (may not read all if lapped, which is acceptable behavior)
     for (int c = 0; c < NUM_CONSUMERS; c++) {
         EXPECT_GT(total_consumed[c].load(), 0u)
             << "Consumer " << c << " read zero events";

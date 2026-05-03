@@ -17,9 +17,10 @@ A limit order book and matching engine written in C++20, built from scratch to u
 7. [Benchmarks](#benchmarks)
 8. [Latency Profile](#latency-profile)
 9. [Building and Running](#building-and-running)
-10. [Deployment](#deployment)
-11. [Project Structure](#project-structure)
-12. [Design Decisions](#design-decisions)
+10. [Testing](#testing)
+11. [Deployment](#deployment)
+12. [Project Structure](#project-structure)
+13. [Design Decisions](#design-decisions)
 
 ---
 
@@ -485,6 +486,28 @@ docker-compose up --build
 # Engine:   http://localhost:8080
 # Frontend: http://localhost:3000
 ```
+
+---
+
+## Testing
+
+The engine includes a comprehensive suite of Google Test (GTest) cases ensuring correctness, concurrency safety, and stability. 
+
+### Running Tests
+
+```bash
+cmake -B build -S engine -DCMAKE_BUILD_TYPE=Release -DUWS_ENABLE=OFF
+cmake --build build --target test_runner -j$(nproc)
+cd build && ctest --output-on-failure
+# Or run the executable directly:
+# ./build/test_runner
+```
+
+### Test Coverage Highlights
+- **LimitOrderBook**: Validates price-time priority, O(1) BBO advancement/retreat, and boundary price handling.
+- **MatchingEngine**: End-to-end integration tests verifying complex crossing logic (partial fills, multi-level sweeps, resting orders).
+- **Concurrency Queues**: Multi-threaded producer-consumer tests ensuring `SPSCQueue` and `SPMCQueue` data integrity under heavy contention.
+- **Memory Management**: Validates `ObjectPool` free-list LIFO guarantees, zero-allocation constraints, and capacity limits.
 
 ---
 

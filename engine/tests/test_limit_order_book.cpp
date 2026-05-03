@@ -1,8 +1,3 @@
-// ============================================================================
-// Test Suite: LimitOrderBook
-// Tests: insertion, removal, best bid/ask tracking, boundary prices,
-//        advance/retreat BBO, empty level handling
-// ============================================================================
 #include <gtest/gtest.h>
 #include <memory_resource>
 #include "data/LimitOrderBook.hpp"
@@ -21,7 +16,6 @@ protected:
     std::pmr::polymorphic_allocator<std::byte> alloc{memory.get_allocator()};
     LimitOrderBook lob{MIN_PRICE, MAX_PRICE, alloc};
 
-    // Helper: create a stack-allocated Order (tests own lifetime)
     Order make_order(uint64_t id, uint32_t price, uint32_t qty, Side side) {
         Order o;
         o.id = id;
@@ -33,10 +27,6 @@ protected:
         return o;
     }
 };
-
-// ============================================================================
-// Construction & Initial State
-// ============================================================================
 TEST_F(LimitOrderBookTest, InitialBestBidIsZero) {
     EXPECT_EQ(lob.best_bid(), 0u);
 }
@@ -50,9 +40,6 @@ TEST_F(LimitOrderBookTest, PriceRange) {
     EXPECT_EQ(lob.max_price(), MAX_PRICE);
 }
 
-// ============================================================================
-// Insertion
-// ============================================================================
 TEST_F(LimitOrderBookTest, AddSingleBid) {
     Order bid = make_order(1, 15000, 100, Side::Buy);
     lob.add_order(&bid);
@@ -86,7 +73,7 @@ TEST_F(LimitOrderBookTest, BestBidTracksHighest) {
     EXPECT_EQ(lob.best_bid(), 15100u);
 
     lob.add_order(&bid3);
-    EXPECT_EQ(lob.best_bid(), 15100u); // Should not change
+    EXPECT_EQ(lob.best_bid(), 15100u);
 }
 
 TEST_F(LimitOrderBookTest, BestAskTracksLowest) {
@@ -101,7 +88,7 @@ TEST_F(LimitOrderBookTest, BestAskTracksLowest) {
     EXPECT_EQ(lob.best_ask(), 15400u);
 
     lob.add_order(&ask3);
-    EXPECT_EQ(lob.best_ask(), 15400u); // Should not change
+    EXPECT_EQ(lob.best_ask(), 15400u);
 }
 
 TEST_F(LimitOrderBookTest, MultipleOrdersSamePriceLevel) {
@@ -113,13 +100,10 @@ TEST_F(LimitOrderBookTest, MultipleOrdersSamePriceLevel) {
 
     PriceLevel* level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 300u);
-    EXPECT_EQ(level->orders.head(), &bid1); // FIFO: first in = head
+    EXPECT_EQ(level->orders.head(), &bid1); 
     EXPECT_EQ(level->orders.tail(), &bid2);
 }
 
-// ============================================================================
-// Removal & BBO Retreat/Advance
-// ============================================================================
 TEST_F(LimitOrderBookTest, RemoveOrderUpdatesVolume) {
     Order bid = make_order(1, 15000, 100, Side::Buy);
     lob.add_order(&bid);
@@ -158,8 +142,6 @@ TEST_F(LimitOrderBookTest, RemoveAllBidsResetsBestBid) {
     Order bid = make_order(1, 15000, 100, Side::Buy);
     lob.add_order(&bid);
     lob.remove_order(&bid);
-
-    // best_bid should retreat to 0 (no bids)
     EXPECT_EQ(lob.best_bid(), 0u);
 }
 
@@ -167,14 +149,8 @@ TEST_F(LimitOrderBookTest, RemoveAllAsksResetsBestAsk) {
     Order ask = make_order(1, 15000, 100, Side::Sell);
     lob.add_order(&ask);
     lob.remove_order(&ask);
-
-    // best_ask should advance beyond MAX_PRICE
     EXPECT_GT(lob.best_ask(), MAX_PRICE);
 }
-
-// ============================================================================
-// Boundary Prices
-// ============================================================================
 TEST_F(LimitOrderBookTest, OrderAtMinPrice) {
     Order bid = make_order(1, MIN_PRICE, 100, Side::Buy);
     lob.add_order(&bid);
@@ -201,14 +177,11 @@ TEST_F(LimitOrderBookTest, OutOfRangePriceReturnsNull) {
 
 TEST_F(LimitOrderBookTest, InvalidPriceRangeThrows) {
     EXPECT_THROW(
-        LimitOrderBook(20000, 10000, alloc), // max < min
+        LimitOrderBook(20000, 10000, alloc), 
         std::invalid_argument
     );
 }
 
-// ============================================================================
-// Partial Removal (one order from a multi-order level)
-// ============================================================================
 TEST_F(LimitOrderBookTest, RemoveOneOfTwoAtSameLevel) {
     Order bid1 = make_order(1, 15000, 100, Side::Buy);
     Order bid2 = make_order(2, 15000, 200, Side::Buy);
@@ -220,5 +193,5 @@ TEST_F(LimitOrderBookTest, RemoveOneOfTwoAtSameLevel) {
     PriceLevel* level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 200u);
     EXPECT_EQ(level->orders.head(), &bid2);
-    EXPECT_EQ(lob.best_bid(), 15000u); // Should NOT retreat
+    EXPECT_EQ(lob.best_bid(), 15000u);
 }

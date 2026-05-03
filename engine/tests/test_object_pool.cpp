@@ -1,7 +1,3 @@
-// ============================================================================
-// Test Suite: ObjectPool
-// Tests: allocation, deallocation, reuse, capacity overflow
-// ============================================================================
 #include <gtest/gtest.h>
 #include <memory_resource>
 #include "memory/ObjectPool.hpp"
@@ -56,23 +52,19 @@ TEST_F(ObjectPoolTest, DeallocateAndReuseFromFreeList) {
 
     pool.deallocate(first);
 
-    // Next allocation should reuse the freed slot
     Order* reused = pool.allocate();
     ASSERT_NE(reused, nullptr);
-    EXPECT_EQ(reused, first); // Same memory address
+    EXPECT_EQ(reused, first); 
 
-    // Placement new should have re-initialized it
-    EXPECT_EQ(reused->id, 0u); // Default-constructed
+    EXPECT_EQ(reused->id, 0u);
 }
 
 TEST_F(ObjectPoolTest, CapacityOverflowReturnsNull) {
-    // Fill the pool to capacity
     for (size_t i = 0; i < POOL_CAPACITY; i++) {
         Order* o = pool.allocate();
         ASSERT_NE(o, nullptr) << "Failed at allocation " << i;
     }
 
-    // The next allocation should fail
     Order* overflow = pool.allocate();
     EXPECT_EQ(overflow, nullptr);
 }
@@ -83,23 +75,18 @@ TEST_F(ObjectPoolTest, DeallocateRestoresCapacity) {
         ptrs.push_back(pool.allocate());
     }
 
-    // Pool is full
     EXPECT_EQ(pool.allocate(), nullptr);
 
-    // Free one
     pool.deallocate(ptrs.back());
     ptrs.pop_back();
 
-    // Now one more allocation should succeed
     Order* o = pool.allocate();
     EXPECT_NE(o, nullptr);
 
-    // But not two
     EXPECT_EQ(pool.allocate(), nullptr);
 }
 
 TEST_F(ObjectPoolTest, AllocateDeallocateCycle) {
-    // Repeatedly allocate and deallocate the same slot
     for (int cycle = 0; cycle < 1000; cycle++) {
         Order* o = pool.allocate();
         ASSERT_NE(o, nullptr) << "Failed at cycle " << cycle;
@@ -107,7 +94,6 @@ TEST_F(ObjectPoolTest, AllocateDeallocateCycle) {
         o->price = 15000 + cycle;
         pool.deallocate(o);
     }
-    // Should still be able to allocate after 1000 cycles
     Order* final_alloc = pool.allocate();
     EXPECT_NE(final_alloc, nullptr);
 }
@@ -121,7 +107,6 @@ TEST_F(ObjectPoolTest, FreeListOrderIsLIFO) {
     pool.deallocate(b);
     pool.deallocate(c);
 
-    // Free list is a stack — last deallocated comes out first
     EXPECT_EQ(pool.allocate(), c);
     EXPECT_EQ(pool.allocate(), b);
     EXPECT_EQ(pool.allocate(), a);

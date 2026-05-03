@@ -1,8 +1,3 @@
-// ============================================================================
-// Test Suite: MatchingEngine (Integration)
-// Tests: price-time priority, partial fills, full fills, no-match resting,
-//        multi-level sweeps, cancel-then-match, empty book, edge cases
-// ============================================================================
 #include <gtest/gtest.h>
 #include <memory_resource>
 #include "core/MatchingEngine.hpp"
@@ -20,22 +15,24 @@ using namespace matching_engine::memory;
 using namespace matching_engine::concurrency;
 using namespace matching_engine::core;
 
-// Helper to drain all trade events from the SPMC egress queue
 static std::vector<TradeEvent> drain_trades(
-    SPMCBroadcastQueue<TradeEvent, 1024>& egress, std::size_t& cursor) {
+    SPMCBroadcastQueue<TradeEvent, 1024> &egress, std::size_t &cursor)
+{
     std::vector<TradeEvent> trades;
     TradeEvent ev;
-    while (egress.pop(cursor, ev)) {
+    while (egress.pop(cursor, ev))
+    {
         trades.push_back(ev);
     }
     return trades;
 }
 
-class MatchingEngineTest : public ::testing::Test {
+class MatchingEngineTest : public ::testing::Test
+{
 protected:
     static constexpr uint32_t MIN_PRICE = 10000;
     static constexpr uint32_t MAX_PRICE = 20000;
-    static constexpr size_t   MAX_ORDERS = 10000;
+    static constexpr size_t MAX_ORDERS = 10000;
 
     EngineMemory memory{1024 * 1024 * 50}; // 50 MB
     std::pmr::polymorphic_allocator<std::byte> alloc{memory.get_allocator()};
@@ -47,9 +44,9 @@ protected:
 
     std::size_t egress_cursor = 0;
 
-    // Allocate an order from the pool and set its fields
-    Order* make_order(uint64_t id, uint32_t price, uint32_t qty, Side side) {
-        Order* o = pool.allocate();
+    Order *make_order(uint64_t id, uint32_t price, uint32_t qty, Side side)
+    {
+        Order *o = pool.allocate();
         o->id = id;
         o->price = price;
         o->quantity = qty;
@@ -57,40 +54,38 @@ protected:
         return o;
     }
 
-    // Place a resting order (registers in LOB + cancel lookup)
-    void place_resting(uint64_t id, uint32_t price, uint32_t qty, Side side) {
-        Order* o = make_order(id, price, qty, side);
+    void place_resting(uint64_t id, uint32_t price, uint32_t qty, Side side)
+    {
+        Order *o = make_order(id, price, qty, side);
         lob.add_order(o);
         cancel.register_order(o);
     }
 
-    // Send an aggressive order through the matching engine
-    void send_aggressive(uint64_t id, uint32_t price, uint32_t qty, Side side) {
-        Order* o = make_order(id, price, qty, side);
+    void send_aggressive(uint64_t id, uint32_t price, uint32_t qty, Side side)
+    {
+        Order *o = make_order(id, price, qty, side);
         engine.process_order(o);
     }
 
-    // Drain trade events
-    std::vector<TradeEvent> get_trades() {
+    std::vector<TradeEvent> get_trades()
+    {
         return drain_trades(egress, egress_cursor);
     }
 };
-
-// ============================================================================
-// No-Match: Aggressive order rests in the book
-// ============================================================================
-TEST_F(MatchingEngineTest, BuyOrderRestsWhenNoAsks) {
+TEST_F(MatchingEngineTest, BuyOrderRestsWhenNoAsks)
+{
     send_aggressive(1, 15000, 100, Side::Buy);
 
     auto trades = get_trades();
     EXPECT_TRUE(trades.empty());
     EXPECT_EQ(lob.best_bid(), 15000u);
 
-    PriceLevel* level = lob.get_price_level(15000);
+    PriceLevel *level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 100u);
 }
 
-TEST_F(MatchingEngineTest, SellOrderRestsWhenNoBids) {
+TEST_F(MatchingEngineTest, SellOrderRestsWhenNoBids)
+{
     send_aggressive(1, 15000, 100, Side::Sell);
 
     auto trades = get_trades();
@@ -98,10 +93,9 @@ TEST_F(MatchingEngineTest, SellOrderRestsWhenNoBids) {
     EXPECT_EQ(lob.best_ask(), 15000u);
 }
 
-TEST_F(MatchingEngineTest, BuyBelowBestAskRests) {
-    // Resting ask at 15100
+TEST_F(MatchingEngineTest, BuyBelowBestAskRests)
+{
     place_resting(1, 15100, 100, Side::Sell);
-    // Buy at 15000 — cannot cross
     send_aggressive(2, 15000, 100, Side::Buy);
 
     auto trades = get_trades();
@@ -110,7 +104,8 @@ TEST_F(MatchingEngineTest, BuyBelowBestAskRests) {
     EXPECT_EQ(lob.best_ask(), 15100u);
 }
 
-TEST_F(MatchingEngineTest, SellAboveBestBidRests) {
+TEST_F(MatchingEngineTest, SellAboveBestBidRests)
+{
     place_resting(1, 15000, 100, Side::Buy);
     send_aggressive(2, 15100, 100, Side::Sell);
 
@@ -120,10 +115,8 @@ TEST_F(MatchingEngineTest, SellAboveBestBidRests) {
     EXPECT_EQ(lob.best_ask(), 15100u);
 }
 
-// ============================================================================
-// Full Fill: Aggressive fully consumed by a single resting order
-// ============================================================================
-TEST_F(MatchingEngineTest, FullFillBuyAgainstAsk) {
+TEST_F(MatchingEngineTest, FullFillBuyAgainstAsk)
+{
     place_resting(1, 15000, 100, Side::Sell);
     send_aggressive(2, 15000, 100, Side::Buy);
 
@@ -135,12 +128,12 @@ TEST_F(MatchingEngineTest, FullFillBuyAgainstAsk) {
     EXPECT_EQ(trades[0].quantity, 100u);
     EXPECT_EQ(trades[0].side, Side::Buy);
 
-    // Both orders should be gone from the book
-    PriceLevel* level = lob.get_price_level(15000);
+    PriceLevel *level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 0u);
 }
 
-TEST_F(MatchingEngineTest, FullFillSellAgainstBid) {
+TEST_F(MatchingEngineTest, FullFillSellAgainstBid)
+{
     place_resting(1, 15000, 100, Side::Buy);
     send_aggressive(2, 15000, 100, Side::Sell);
 
@@ -153,10 +146,8 @@ TEST_F(MatchingEngineTest, FullFillSellAgainstBid) {
     EXPECT_EQ(trades[0].side, Side::Sell);
 }
 
-// ============================================================================
-// Partial Fill: Aggressive is larger than resting
-// ============================================================================
-TEST_F(MatchingEngineTest, PartialFillAggressorLargerThanResting) {
+TEST_F(MatchingEngineTest, PartialFillAggressorLargerThanResting)
+{
     place_resting(1, 15000, 50, Side::Sell);
     send_aggressive(2, 15000, 100, Side::Buy);
 
@@ -164,13 +155,13 @@ TEST_F(MatchingEngineTest, PartialFillAggressorLargerThanResting) {
     ASSERT_EQ(trades.size(), 1u);
     EXPECT_EQ(trades[0].quantity, 50u);
 
-    // Remaining 50 of the aggressive should rest as a bid
     EXPECT_EQ(lob.best_bid(), 15000u);
-    PriceLevel* level = lob.get_price_level(15000);
+    PriceLevel *level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 50u);
 }
 
-TEST_F(MatchingEngineTest, PartialFillRestingLargerThanAggressor) {
+TEST_F(MatchingEngineTest, PartialFillRestingLargerThanAggressor)
+{
     place_resting(1, 15000, 200, Side::Sell);
     send_aggressive(2, 15000, 50, Side::Buy);
 
@@ -178,80 +169,65 @@ TEST_F(MatchingEngineTest, PartialFillRestingLargerThanAggressor) {
     ASSERT_EQ(trades.size(), 1u);
     EXPECT_EQ(trades[0].quantity, 50u);
 
-    // Resting order should have 150 remaining
-    PriceLevel* level = lob.get_price_level(15000);
+    PriceLevel *level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 150u);
     EXPECT_EQ(level->orders.head()->quantity, 150u);
 
-    // Aggressive fully consumed — best_bid should be 0 (no bids)
     EXPECT_EQ(lob.best_bid(), 0u);
 }
 
-// ============================================================================
-// Price-Time Priority (FIFO within same price level)
-// ============================================================================
-TEST_F(MatchingEngineTest, PriceTimePriorityFIFO) {
-    // Three resting asks at the same price — order matters
+TEST_F(MatchingEngineTest, PriceTimePriorityFIFO)
+{
     place_resting(10, 15000, 30, Side::Sell);
     place_resting(11, 15000, 30, Side::Sell);
     place_resting(12, 15000, 30, Side::Sell);
 
-    // Aggressive buy for 60 — should fill first two (FIFO)
     send_aggressive(20, 15000, 60, Side::Buy);
 
     auto trades = get_trades();
     ASSERT_EQ(trades.size(), 2u);
-    EXPECT_EQ(trades[0].maker_order_id, 10u); // First resting, first filled
+    EXPECT_EQ(trades[0].maker_order_id, 10u);
     EXPECT_EQ(trades[0].quantity, 30u);
-    EXPECT_EQ(trades[1].maker_order_id, 11u); // Second resting
+    EXPECT_EQ(trades[1].maker_order_id, 11u);
     EXPECT_EQ(trades[1].quantity, 30u);
 
-    // Third resting (id=12) should still be on the book
-    PriceLevel* level = lob.get_price_level(15000);
+    PriceLevel *level = lob.get_price_level(15000);
     EXPECT_EQ(level->total_volume, 30u);
     EXPECT_EQ(level->orders.head()->id, 12u);
 }
 
-// ============================================================================
-// Price Priority: Match at best price first
-// ============================================================================
-TEST_F(MatchingEngineTest, BuyMatchesBestAskFirst) {
-    place_resting(1, 15100, 50, Side::Sell); // Worse price
-    place_resting(2, 15000, 50, Side::Sell); // Better price (lower ask)
+TEST_F(MatchingEngineTest, BuyMatchesBestAskFirst)
+{
+    place_resting(1, 15100, 50, Side::Sell);
+    place_resting(2, 15000, 50, Side::Sell);
 
-    // Aggressive buy at 15200 — should match 15000 first
     send_aggressive(3, 15200, 80, Side::Buy);
 
     auto trades = get_trades();
     ASSERT_EQ(trades.size(), 2u);
-    EXPECT_EQ(trades[0].price, 15000u); // Best ask matched first
+    EXPECT_EQ(trades[0].price, 15000u);
     EXPECT_EQ(trades[0].quantity, 50u);
     EXPECT_EQ(trades[1].price, 15100u);
-    EXPECT_EQ(trades[1].quantity, 30u); // Partial fill of second level
+    EXPECT_EQ(trades[1].quantity, 30u);
 }
 
-TEST_F(MatchingEngineTest, SellMatchesBestBidFirst) {
-    place_resting(1, 14900, 50, Side::Buy);  // Worse price
-    place_resting(2, 15000, 50, Side::Buy);  // Better price (higher bid)
-
-    // Aggressive sell at 14800 — should match 15000 first
+TEST_F(MatchingEngineTest, SellMatchesBestBidFirst)
+{
+    place_resting(1, 14900, 50, Side::Buy);
+    place_resting(2, 15000, 50, Side::Buy);
     send_aggressive(3, 14800, 80, Side::Sell);
 
     auto trades = get_trades();
     ASSERT_EQ(trades.size(), 2u);
-    EXPECT_EQ(trades[0].price, 15000u); // Best bid matched first
+    EXPECT_EQ(trades[0].price, 15000u);
     EXPECT_EQ(trades[1].price, 14900u);
 }
 
-// ============================================================================
-// Multi-Level Sweep
-// ============================================================================
-TEST_F(MatchingEngineTest, AggressorSweepsMultipleLevels) {
+TEST_F(MatchingEngineTest, AggressorSweepsMultipleLevels)
+{
     place_resting(1, 15000, 100, Side::Sell);
     place_resting(2, 15001, 100, Side::Sell);
     place_resting(3, 15002, 100, Side::Sell);
-
-    // Buy for 250 at 15005 — sweeps 3 levels, partial fill on last
     send_aggressive(10, 15005, 250, Side::Buy);
 
     auto trades = get_trades();
@@ -263,73 +239,61 @@ TEST_F(MatchingEngineTest, AggressorSweepsMultipleLevels) {
     EXPECT_EQ(trades[2].price, 15002u);
     EXPECT_EQ(trades[2].quantity, 50u);
 
-    // 15002 level should have 50 remaining
     EXPECT_EQ(lob.get_price_level(15002)->total_volume, 50u);
     EXPECT_EQ(lob.best_ask(), 15002u);
 }
 
-// ============================================================================
-// Price Improvement: Aggressor gets filled at resting price
-// ============================================================================
-TEST_F(MatchingEngineTest, BuyerGetsPriceImprovement) {
+TEST_F(MatchingEngineTest, BuyerGetsPriceImprovement)
+{
     place_resting(1, 14900, 100, Side::Sell);
 
-    // Buy at 15100 — should fill at 14900 (maker's price)
     send_aggressive(2, 15100, 100, Side::Buy);
 
     auto trades = get_trades();
     ASSERT_EQ(trades.size(), 1u);
-    EXPECT_EQ(trades[0].price, 14900u); // Filled at resting (better) price
+    EXPECT_EQ(trades[0].price, 14900u);
 }
 
-TEST_F(MatchingEngineTest, SellerGetsPriceImprovement) {
+TEST_F(MatchingEngineTest, SellerGetsPriceImprovement)
+{
     place_resting(1, 15200, 100, Side::Buy);
 
-    // Sell at 14900 — should fill at 15200 (maker's price)
     send_aggressive(2, 14900, 100, Side::Sell);
 
     auto trades = get_trades();
     ASSERT_EQ(trades.size(), 1u);
-    EXPECT_EQ(trades[0].price, 15200u); // Filled at resting (better) price
+    EXPECT_EQ(trades[0].price, 15200u);
 }
-
-// ============================================================================
-// Cancel then Match
-// ============================================================================
-TEST_F(MatchingEngineTest, CancelledOrderIsNotMatched) {
+TEST_F(MatchingEngineTest, CancelledOrderIsNotMatched)
+{
     place_resting(1, 15000, 100, Side::Sell);
 
-    // Cancel the resting order
-    Order* to_cancel = cancel.get_order(1);
+    Order *to_cancel = cancel.get_order(1);
     ASSERT_NE(to_cancel, nullptr);
     lob.remove_order(to_cancel);
     cancel.deregister_order(1);
     pool.deallocate(to_cancel);
-
-    // Now send a buy — should not match (book is empty)
     send_aggressive(2, 15000, 100, Side::Buy);
 
     auto trades = get_trades();
     EXPECT_TRUE(trades.empty());
-    EXPECT_EQ(lob.best_bid(), 15000u); // Rests in book
+    EXPECT_EQ(lob.best_bid(), 15000u);
 }
 
-// ============================================================================
-// BBO Advancement After Full Level Drain
-// ============================================================================
-TEST_F(MatchingEngineTest, BestAskAdvancesAfterLevelDrained) {
+TEST_F(MatchingEngineTest, BestAskAdvancesAfterLevelDrained)
+{
     place_resting(1, 15000, 50, Side::Sell);
     place_resting(2, 15001, 50, Side::Sell);
 
     EXPECT_EQ(lob.best_ask(), 15000u);
 
-    // Sweep the first level completely
     send_aggressive(3, 15000, 50, Side::Buy);
 
     EXPECT_EQ(lob.best_ask(), 15001u);
 }
 
-TEST_F(MatchingEngineTest, BestBidRetreatsAfterLevelDrained) {
+TEST_F(MatchingEngineTest, BestBidRetreatsAfterLevelDrained)
+{
     place_resting(1, 15000, 50, Side::Buy);
     place_resting(2, 14999, 50, Side::Buy);
 
@@ -340,10 +304,8 @@ TEST_F(MatchingEngineTest, BestBidRetreatsAfterLevelDrained) {
     EXPECT_EQ(lob.best_bid(), 14999u);
 }
 
-// ============================================================================
-// Trade Event Correctness
-// ============================================================================
-TEST_F(MatchingEngineTest, TradeEventHasIncrementingId) {
+TEST_F(MatchingEngineTest, TradeEventHasIncrementingId)
+{
     place_resting(1, 15000, 50, Side::Sell);
     place_resting(2, 15001, 50, Side::Sell);
 
@@ -355,7 +317,8 @@ TEST_F(MatchingEngineTest, TradeEventHasIncrementingId) {
     EXPECT_EQ(trades[1].trade_id, 2u);
 }
 
-TEST_F(MatchingEngineTest, TradeEventRecordsMakerAndTaker) {
+TEST_F(MatchingEngineTest, TradeEventRecordsMakerAndTaker)
+{
     place_resting(100, 15000, 50, Side::Sell);
     send_aggressive(200, 15000, 50, Side::Buy);
 
@@ -365,31 +328,28 @@ TEST_F(MatchingEngineTest, TradeEventRecordsMakerAndTaker) {
     EXPECT_EQ(trades[0].taker_order_id, 200u);
 }
 
-// ============================================================================
-// Edge Cases
-// ============================================================================
-TEST_F(MatchingEngineTest, ZeroQuantityOrderDoesNotCrash) {
-    // A zero-qty aggressive order should rest without generating trades
+TEST_F(MatchingEngineTest, ZeroQuantityOrderDoesNotCrash)
+{
     send_aggressive(1, 15000, 0, Side::Buy);
     auto trades = get_trades();
     EXPECT_TRUE(trades.empty());
 }
 
-TEST_F(MatchingEngineTest, ManyOrdersStressTest) {
-    // Place 1000 resting asks
-    for (uint64_t i = 1; i <= 1000; i++) {
+TEST_F(MatchingEngineTest, ManyOrdersStressTest)
+{
+    for (uint64_t i = 1; i <= 1000; i++)
+    {
         place_resting(i, 15000 + (i % 50), 10, Side::Sell);
     }
 
-    // Sweep with a large buy order
     send_aggressive(2000, 15050, 5000, Side::Buy);
 
     auto trades = get_trades();
     EXPECT_GT(trades.size(), 0u);
 
-    // Verify no duplicate trade IDs
     std::vector<uint64_t> ids;
-    for (auto& t : trades) {
+    for (auto &t : trades)
+    {
         ids.push_back(t.trade_id);
     }
     std::sort(ids.begin(), ids.end());
@@ -397,15 +357,14 @@ TEST_F(MatchingEngineTest, ManyOrdersStressTest) {
     EXPECT_EQ(it, ids.end()) << "Duplicate trade ID found: " << *it;
 }
 
-TEST_F(MatchingEngineTest, BothSidesCanRestSimultaneously) {
-    // Place bids and asks that don't cross
+TEST_F(MatchingEngineTest, BothSidesCanRestSimultaneously)
+{
     place_resting(1, 14000, 100, Side::Buy);
     place_resting(2, 16000, 100, Side::Sell);
 
     EXPECT_EQ(lob.best_bid(), 14000u);
     EXPECT_EQ(lob.best_ask(), 16000u);
 
-    // Spread = 2000 ticks — no crossing should happen
     auto trades = get_trades();
     EXPECT_TRUE(trades.empty());
 }
