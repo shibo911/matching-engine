@@ -157,8 +157,10 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
 
     std::vector<std::thread> consumers;
     std::atomic<size_t> total_consumed[NUM_CONSUMERS];
+    std::atomic<size_t> final_cursor[NUM_CONSUMERS];
     for (int c = 0; c < NUM_CONSUMERS; c++) {
         total_consumed[c].store(0);
+        final_cursor[c].store(0);
     }
 
     for (int c = 0; c < NUM_CONSUMERS; c++) {
@@ -180,6 +182,7 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
                 }
             }
             total_consumed[c].store(count);
+            final_cursor[c].store(cursor);
         });
     }
 
@@ -187,7 +190,13 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
     for (auto& t : consumers) t.join();
 
     for (int c = 0; c < NUM_CONSUMERS; c++) {
-        EXPECT_GT(total_consumed[c].load(), 0u)
-            << "Consumer " << c << " read zero events";
+        size_t consumed = total_consumed[c].load();
+        size_t fc = final_cursor[c].load();
+        // A consumer might read 0 events ONLY IF the OS scheduled it so late 
+        // that the producer entirely finished before the consumer started, 
+        // causing it to fast-forward past everything. 
+        // But if that happens, the cursor MUST have been fast-forwarded.
+        EXPECT_TRUE(consumed > 0 || fc >= NUM_ITEMS * 2)
+            << "Consumer " << c << " read zero events and didn't fast-forward. Cursor: " << fc;
     }
 }

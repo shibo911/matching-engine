@@ -19,6 +19,7 @@ WORKDIR /build
 COPY engine/CMakeLists.txt engine/
 COPY engine/include/ engine/include/
 COPY engine/src/ engine/src/
+COPY engine/tests/ engine/tests/
 
 # Build with aggressive optimization flags
 WORKDIR /build/engine

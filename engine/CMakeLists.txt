@@ -128,7 +128,8 @@ add_executable(test_runner
     tests/test_matching_engine.cpp
     src/memory/EngineMemory.cpp
 )
-target_link_libraries(test_runner PRIVATE GTest::gtest GTest::gtest_main pthread)
+find_package(Threads REQUIRED)
+target_link_libraries(test_runner PRIVATE GTest::gtest GTest::gtest_main Threads::Threads)
 
 # Tests compile without aggressive optimization — avoids GCC 11 PMR bugs
 # and makes debugging test failures easier.
