@@ -130,8 +130,13 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
     SPMCBroadcastQueue<TradeEvent, 1024> cq{alloc2};
 
     std::atomic<bool> done{false};
+    std::atomic<int> ready_consumers{0};
 
     std::thread producer([&]() {
+        // Wait for all consumers to spin up before blasting items
+        while (ready_consumers.load(std::memory_order_acquire) < NUM_CONSUMERS) {
+            std::this_thread::yield();
+        }
         for (uint64_t i = 1; i <= NUM_ITEMS; i++) {
             cq.push(TradeEvent{
                 .trade_id = i,
@@ -142,6 +147,10 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
                 .side = Side::Buy,
                 .reserved = {0, 0, 0}
             });
+            // Yield occasionally to give consumers CPU time to read
+            if (i % 100 == 0) {
+                std::this_thread::sleep_for(std::chrono::microseconds(50));
+            }
         }
         done.store(true, std::memory_order_release);
     });
@@ -156,6 +165,8 @@ TEST_F(SPMCQueueTest, ConcurrentProducerMultipleConsumers) {
 
     for (int c = 0; c < NUM_CONSUMERS; c++) {
         consumers.emplace_back([&, c]() {
+            ready_consumers.fetch_add(1, std::memory_order_release);
+            
             std::size_t cursor = 0;
             TradeEvent out;
             size_t count = 0;
